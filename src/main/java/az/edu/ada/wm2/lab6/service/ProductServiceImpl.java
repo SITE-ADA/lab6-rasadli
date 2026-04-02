@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,11 +34,13 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public ProductResponseDto createProduct(ProductRequestDto dto) {
+        validatePrice(dto.getPrice());
+
         Product product = productMapper.toEntity(dto);
 
         if (dto.getCategoryIds() != null && !dto.getCategoryIds().isEmpty()) {
             List<Category> categories = categoryRepository.findAllById(dto.getCategoryIds());
-            product.setCategories(new HashSet<>(categories));
+            product.setCategories(new ArrayList<>(categories));
         }
 
         Product savedProduct = productRepository.save(product);
@@ -63,6 +65,8 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public ProductResponseDto updateProduct(UUID id, ProductRequestDto dto) {
+        validatePrice(dto.getPrice());
+
         Product existingProduct = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
 
@@ -72,7 +76,7 @@ public class ProductServiceImpl implements ProductService {
 
         if (dto.getCategoryIds() != null) {
             List<Category> categories = categoryRepository.findAllById(dto.getCategoryIds());
-            existingProduct.setCategories(new HashSet<>(categories));
+            existingProduct.setCategories(new ArrayList<>(categories));
         }
 
         Product updatedProduct = productRepository.save(existingProduct);
@@ -81,10 +85,10 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public void deleteProduct(UUID id) {
-        if (!productRepository.existsById(id)) {
-            throw new RuntimeException("Product not found with id: " + id);
-        }
-        productRepository.deleteById(id);
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
+
+        productRepository.delete(product);
     }
 
     @Override
@@ -101,5 +105,11 @@ public class ProductServiceImpl implements ProductService {
                 .stream()
                 .map(productMapper::toResponseDto)
                 .toList();
+    }
+
+    private void validatePrice(BigDecimal price) {
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Price must be greater than zero");
+        }
     }
 }
